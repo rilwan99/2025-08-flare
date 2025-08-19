@@ -174,7 +174,7 @@ The FAssets system is able to support wrapped tokens for XRP, BTC and DOGE. Howe
 
 ## Main invariants
 
-See [System Design](SystemDesign.md).
+Further documentation of the system design is forthcoming and will be added to this `README` as soon as it’s available.
 
 ## All trusted roles in the protocol
 
