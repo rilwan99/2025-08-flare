@@ -75,8 +75,13 @@ The FAssets system is able to support wrapped tokens for XRP, BTC and DOGE. Howe
 
 *See [scope.txt](https://github.com/code-423n4/2025-08-flare/blob/main/scope.txt)*
 
+
 | File   | Logic Contracts | Interfaces | nSLOC | Purpose | Libraries used |
 | ------ | --------------- | ---------- | ----- | -----   | ------------ |
+| /contracts/agentOwnerRegistry/implementation/AgentOwnerRegistry.sol | 1| **** | 116 | |@openzeppelin/contracts/utils/introspection/IERC165.sol<br>@flarenetwork/flare-periphery-contracts/flare/IGovernanceSettings.sol|
+| /contracts/agentOwnerRegistry/implementation/AgentOwnerRegistryProxy.sol | 1| **** | 15 | |@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol<br>@flarenetwork/flare-periphery-contracts/flare/IGovernanceSettings.sol|
+| /contracts/agentVault/implementation/AgentVault.sol | 1| **** | 94 | |@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol<br>@openzeppelin/contracts/token/ERC20/IERC20.sol<br>@openzeppelin/contracts/utils/introspection/IERC165.sol<br>@openzeppelin/contracts/proxy/utils/UUPSUpgradeable.sol|
+| /contracts/agentVault/implementation/AgentVaultFactory.sol | 1| **** | 27 | |@openzeppelin/contracts/utils/introspection/IERC165.sol<br>@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol|
 | /contracts/assetManager/facets/AgentAlwaysAllowedMintersFacet.sol | 1| **** | 19 | |@openzeppelin/contracts/utils/structs/EnumerableSet.sol|
 | /contracts/assetManager/facets/AgentCollateralFacet.sol | 1| **** | 121 | |@openzeppelin/contracts/token/ERC20/IERC20.sol<br>@openzeppelin/contracts/utils/math/SafeCast.sol|
 | /contracts/assetManager/facets/AgentInfoFacet.sol | 1| **** | 130 | |@openzeppelin/contracts/token/ERC20/IERC20.sol<br>@openzeppelin/contracts/utils/math/Math.sol<br>@openzeppelin/contracts/utils/math/SafeCast.sol|
@@ -142,24 +147,58 @@ The FAssets system is able to support wrapped tokens for XRP, BTC and DOGE. Howe
 | /contracts/assetManager/library/data/RedemptionQueue.sol | 1| **** | 88 | ||
 | /contracts/assetManager/library/data/RedemptionTimeExtension.sol | 1| **** | 37 | |@openzeppelin/contracts/utils/math/SafeCast.sol|
 | /contracts/assetManager/library/data/UnderlyingAddressOwnership.sol | 1| **** | 19 | ||
-| /contracts/assetManager/library/mock/ConversionMock.sol | 1| **** | 24 | |@openzeppelin/contracts/utils/math/SafeCast.sol|
-| /contracts/assetManager/library/mock/RedemptionQueueMock.sol | 1| **** | 15 | ||
-| /contracts/governance/implementation/Governed.sol | 1| **** | 8 | |@flarenetwork/flare-periphery-contracts/flare/IGovernanceSettings.sol|
-| /contracts/governance/implementation/GovernedBase.sol | 1| **** | 133 | |@flarenetwork/flare-periphery-contracts/flare/IGovernanceSettings.sol|
-| /contracts/governance/implementation/GovernedProxyImplementation.sol | 1| **** | 8 | ||
-| /contracts/governance/implementation/GovernedUUPSProxyImplementation.sol | 1| **** | 22 | |@openzeppelin/contracts/proxy/utils/UUPSUpgradeable.sol|
+| /contracts/assetManagerController/implementation/AssetManagerController.sol | 1| **** | 340 | |@openzeppelin/contracts/utils/structs/EnumerableSet.sol<br>@openzeppelin/contracts/utils/Address.sol<br>@openzeppelin/contracts/proxy/utils/UUPSUpgradeable.sol<br>@flarenetwork/flare-periphery-contracts/flare/addressUpdater/interfaces/IIAddressUpdater.sol<br>@flarenetwork/flare-periphery-contracts/flare/IGovernanceSettings.sol<br>@openzeppelin/contracts/token/ERC20/IERC20.sol<br>@openzeppelin/contracts/utils/introspection/IERC165.sol<br>@flarenetwork/flare-periphery-contracts/flare/addressUpdater/interfaces/IIAddressUpdatable.sol|
+| /contracts/assetManagerController/implementation/AssetManagerControllerProxy.sol | 1| **** | 20 | |@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol<br>@flarenetwork/flare-periphery-contracts/flare/IGovernanceSettings.sol|
+| /contracts/collateralPool/implementation/CollateralPool.sol | 1| **** | 421 | |@openzeppelin/contracts/utils/introspection/IERC165.sol<br>@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol<br>@openzeppelin/contracts/proxy/utils/UUPSUpgradeable.sol<br>@openzeppelin/contracts/utils/math/SafeCast.sol<br>@openzeppelin/contracts/utils/math/Math.sol<br>@flarenetwork/flare-periphery-contracts/flare/IRewardManager.sol<br>@flarenetwork/flare-periphery-contracts/flare/IDistributionToDelegators.sol|
+| /contracts/collateralPool/implementation/CollateralPoolFactory.sol | 1| **** | 31 | |@openzeppelin/contracts/utils/introspection/IERC165.sol<br>@openzeppelin/contracts/utils/math/SafeCast.sol<br>@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol|
+| /contracts/collateralPool/implementation/CollateralPoolToken.sol | 1| **** | 150 | |@openzeppelin/contracts/utils/introspection/IERC165.sol<br>@openzeppelin/contracts/token/ERC20/ERC20.sol<br>@openzeppelin/contracts/token/ERC20/IERC20.sol<br>@openzeppelin/contracts/proxy/utils/UUPSUpgradeable.sol<br>@openzeppelin/contracts/utils/math/SafeCast.sol|
+| /contracts/collateralPool/implementation/CollateralPoolTokenFactory.sol | 1| **** | 29 | |@openzeppelin/contracts/utils/introspection/IERC165.sol<br>@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol|
+| /contracts/coreVaultManager/implementation/CoreVaultManager.sol | 1| **** | 515 | |@openzeppelin/contracts/utils/introspection/IERC165.sol<br>@openzeppelin/contracts/utils/structs/EnumerableSet.sol<br>@openzeppelin/contracts/utils/math/Math.sol<br>@flarenetwork/flare-periphery-contracts/flare/IFdcVerification.sol<br>@flarenetwork/flare-periphery-contracts/flare/IGovernanceSettings.sol<br>@flarenetwork/flare-periphery-contracts/flare/addressUpdater/interfaces/IIAddressUpdatable.sol|
+| /contracts/coreVaultManager/implementation/CoreVaultManagerProxy.sol | 1| **** | 26 | |@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol<br>@flarenetwork/flare-periphery-contracts/flare/IGovernanceSettings.sol|
+| /contracts/diamond/facets/DiamondLoupeFacet.sol | 1| **** | 96 | |@openzeppelin/contracts/utils/introspection/IERC165.sol|
+| /contracts/diamond/implementation/Diamond.sol | 1| **** | 29 | ||
+| /contracts/diamond/library/LibDiamond.sol | 1| **** | 151 | ||
 | /contracts/fassetToken/implementation/CheckPointable.sol | 1| **** | 77 | ||
 | /contracts/fassetToken/implementation/FAsset.sol | 1| **** | 125 | |@openzeppelin/contracts/token/ERC20/ERC20.sol<br>@openzeppelin/contracts/token/ERC20/IERC20.sol<br>@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol<br>@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol<br>@openzeppelin/contracts/utils/introspection/IERC165.sol<br>@openzeppelin/contracts/interfaces/IERC5267.sol<br>@openzeppelin/contracts/proxy/utils/UUPSUpgradeable.sol<br>@flarenetwork/flare-periphery-contracts/flare/token/interfaces/IICleanable.sol|
 | /contracts/fassetToken/implementation/FAssetProxy.sol | 1| **** | 18 | |@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol|
 | /contracts/fassetToken/library/CheckPointHistory.sol | 1| **** | 88 | |@openzeppelin/contracts/utils/math/Math.sol<br>@openzeppelin/contracts/utils/math/SafeCast.sol|
 | /contracts/fassetToken/library/CheckPointsByAddress.sol | 1| **** | 38 | ||
+| /contracts/flareSmartContracts/implementation/AddressUpdatable.sol | 1| **** | 43 | |@flarenetwork/flare-periphery-contracts/flare/addressUpdater/interfaces/IIAddressUpdatable.sol|
+| /contracts/ftso/implementation/FtsoV2PriceStore.sol | 1| **** | 276 | |@openzeppelin/contracts/utils/introspection/IERC165.sol<br>@openzeppelin/contracts/utils/cryptography/MerkleProof.sol<br>@flarenetwork/flare-periphery-contracts/flare/IRelay.sol<br>@flarenetwork/flare-periphery-contracts/flare/IGovernanceSettings.sol|
+| /contracts/ftso/implementation/FtsoV2PriceStoreProxy.sol | 1| **** | 22 | |@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol<br>@flarenetwork/flare-periphery-contracts/flare/IGovernanceSettings.sol|
+| /contracts/governance/implementation/Governed.sol | 1| **** | 8 | |@flarenetwork/flare-periphery-contracts/flare/IGovernanceSettings.sol|
+| /contracts/governance/implementation/GovernedBase.sol | 1| **** | 133 | |@flarenetwork/flare-periphery-contracts/flare/IGovernanceSettings.sol|
+| /contracts/governance/implementation/GovernedProxyImplementation.sol | 1| **** | 8 | ||
+| /contracts/governance/implementation/GovernedUUPSProxyImplementation.sol | 1| **** | 22 | |@openzeppelin/contracts/proxy/utils/UUPSUpgradeable.sol|
+| /contracts/userInterfaces/IAgentAlwaysAllowedMinters.sol | ****| 1 | 3 | ||
+| /contracts/userInterfaces/IAgentOwnerRegistry.sol | ****| 1 | 18 | ||
+| /contracts/userInterfaces/IAgentPing.sol | ****| 1 | 12 | ||
+| /contracts/userInterfaces/IAgentVault.sol | ****| 1 | 11 | |@openzeppelin/contracts/token/ERC20/IERC20.sol|
+| /contracts/userInterfaces/IAssetManager.sol | ****| 1 | 32 | |@flarenetwork/flare-periphery-contracts/flare/IFdcVerification.sol<br>@openzeppelin/contracts/utils/introspection/IERC165.sol<br>@openzeppelin/contracts/token/ERC20/IERC20.sol|
+| /contracts/userInterfaces/IAssetManagerController.sol | ****| 1 | 4 | ||
+| /contracts/userInterfaces/IAssetManagerEvents.sol | ****| 1 | 249 | ||
+| /contracts/userInterfaces/ICollateralPool.sol | ****| 1 | 59 | |@flarenetwork/flare-periphery-contracts/flare/IDistributionToDelegators.sol<br>@flarenetwork/flare-periphery-contracts/flare/IRewardManager.sol|
+| /contracts/userInterfaces/ICollateralPoolToken.sol | ****| 1 | 5 | |@openzeppelin/contracts/token/ERC20/IERC20.sol|
+| /contracts/userInterfaces/ICoreVaultClient.sol | ****| 1 | 35 | |@flarenetwork/flare-periphery-contracts/flare/IFdcVerification.sol|
+| /contracts/userInterfaces/ICoreVaultClientSettings.sol | ****| 1 | 3 | ||
+| /contracts/userInterfaces/ICoreVaultManager.sol | ****| 1 | 114 | |@flarenetwork/flare-periphery-contracts/flare/IFdcVerification.sol|
+| /contracts/userInterfaces/IFAsset.sol | ****| 1 | 5 | |@openzeppelin/contracts/token/ERC20/IERC20.sol<br>@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol|
+| /contracts/userInterfaces/IRedemptionTimeExtension.sol | ****| 1 | 3 | ||
+| /contracts/userInterfaces/data/AgentInfo.sol | 1| **** | 53 | |@openzeppelin/contracts/token/ERC20/IERC20.sol|
+| /contracts/userInterfaces/data/AgentSettings.sol | 1| **** | 15 | |@openzeppelin/contracts/token/ERC20/IERC20.sol|
+| /contracts/userInterfaces/data/AssetManagerSettings.sol | 1| **** | 65 | ||
+| /contracts/userInterfaces/data/AvailableAgentInfo.sol | 1| **** | 13 | ||
+| /contracts/userInterfaces/data/CollateralReservationInfo.sol | 1| **** | 26 | ||
+| /contracts/userInterfaces/data/CollateralType.sol | 1| **** | 20 | |@openzeppelin/contracts/token/ERC20/IERC20.sol|
+| /contracts/userInterfaces/data/RedemptionRequestInfo.sol | 1| **** | 30 | ||
+| /contracts/userInterfaces/data/RedemptionTicketInfo.sol | 1| **** | 8 | ||
 | /contracts/utils/Imports_Solidity_0_6.sol | ****| **** | 2 | |@gnosis.pm/mock-contract/contracts/MockContract.sol|
 | /contracts/utils/library/MathUtils.sol | 1| **** | 19 | ||
 | /contracts/utils/library/MerkleTree.sol | 1| **** | 69 | ||
 | /contracts/utils/library/SafeMath64.sol | 1| **** | 22 | ||
 | /contracts/utils/library/SafePct.sol | 1| **** | 30 | ||
 | /contracts/utils/library/Transfers.sol | 1| **** | 22 | ||
-| **Totals** | **81** | **** | **5615** | | |
+| **Totals** | **105** | **14** | **8760** | | |
 
 ### Files out of scope
 
