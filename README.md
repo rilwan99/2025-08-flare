@@ -20,7 +20,7 @@
     - [The "live criticals" exception](https://docs.code4rena.com/awarding#the-live-criticals-exception) therefore applies.
 
 2. A coded, runnable PoC is required for all High/Medium submissions to this audit.
-    - This repo includes a basic template to run the test suite.
+    - This repo includes [a basic template](https://github.com/code-423n4/2025-08-flare/blob/main/test/PoC-template.ts) to run the test suite.
     - PoCs must use the test suite provided in this repo.
     - Your submission will be marked as Insufficient if the POC is not runnable and working with the provided test suite.
     - Exception: PoC is optional (though recommended) for wardens with signal ≥ 0.68.
