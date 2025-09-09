@@ -140,6 +140,7 @@ contract AgentCollateralFacet is AssetManagerBase, ReentrancyGuard {
         Agent.State storage agent = Agent.get(_agentVault);
         require(msg.sender == _agentVault || msg.sender == address(agent.collateralPool),
             OnlyAgentVaultOrPool());
+
         // try to pull agent out of liquidation
         if (agent.isCollateralToken(_token)) {
             Liquidation.endLiquidationIfHealthy(agent);

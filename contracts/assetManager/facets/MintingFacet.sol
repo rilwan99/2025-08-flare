@@ -122,14 +122,17 @@ contract MintingFacet is AssetManagerBase, ReentrancyGuard {
         Agent.State storage agent = Agent.get(_agentVault);
         Agents.requireAgentVaultOwner(agent);
         Agents.requireWhitelistedAgentVaultOwner(agent);
+
         Collateral.CombinedData memory collateralData = AgentCollateral.combinedData(agent);
         TransactionAttestation.verifyPaymentSuccess(_payment);
         require(state.mintingPausedAt == 0, MintingPaused());
         require(agent.status == Agent.Status.NORMAL, SelfMintInvalidAgentStatus());
         require(collateralData.freeCollateralLots(agent) >= _lots, NotEnoughFreeCollateral());
+
         uint64 valueAMG = Conversion.convertLotsToAMG(_lots);
         uint256 mintValueUBA = Conversion.convertAmgToUBA(valueAMG);
         uint256 poolFeeUBA = Minting.calculateCurrentPoolFeeUBA(agent, mintValueUBA);
+
         Minting.checkMintingCap(valueAMG + Conversion.convertUBAToAmg(poolFeeUBA));
         require(_payment.data.responseBody.standardPaymentReference == PaymentReference.selfMint(_agentVault),
             InvalidSelfMintReference());
@@ -175,14 +178,17 @@ contract MintingFacet is AssetManagerBase, ReentrancyGuard {
         Agents.requireAgentVaultOwner(agent);
         Agents.requireWhitelistedAgentVaultOwner(agent);
         Collateral.CombinedData memory collateralData = AgentCollateral.combinedData(agent);
+
         require(state.mintingPausedAt == 0, MintingPaused());
         require(_lots > 0, CannotMintZeroLots());
         require(agent.status == Agent.Status.NORMAL, SelfMintInvalidAgentStatus());
         require(collateralData.freeCollateralLots(agent) >= _lots, NotEnoughFreeCollateral());
+
         uint64 valueAMG = Conversion.convertLotsToAMG(_lots);
         uint256 mintValueUBA = Conversion.convertAmgToUBA(valueAMG);
         uint256 poolFeeUBA = Minting.calculateCurrentPoolFeeUBA(agent, mintValueUBA);
         Minting.checkMintingCap(valueAMG + Conversion.convertUBAToAmg(poolFeeUBA));
+
         uint256 requiredUnderlyingAfter = UnderlyingBalance.requiredUnderlyingUBA(agent) + mintValueUBA + poolFeeUBA;
         require(requiredUnderlyingAfter.toInt256() <= agent.underlyingBalanceUBA, FreeUnderlyingBalanceToSmall());
         _performMinting(agent, MintingType.FROM_FREE_UNDERLYING, 0, msg.sender, valueAMG, 0, poolFeeUBA);

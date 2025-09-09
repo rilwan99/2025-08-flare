@@ -55,7 +55,7 @@ contract CollateralPool is IICollateralPool, ReentrancyGuard, UUPSUpgradeable, I
     mapping(address => int256) private _fAssetFeeDebtOf;
     int256 public totalFAssetFeeDebt;
     uint256 public totalFAssetFees;
-    uint256 public totalCollateral;
+    uint256 public totalCollateral; // @note represents total amount of wNAT held by this contract
 
     modifier onlyAssetManager {
         require(msg.sender == address(assetManager), OnlyAssetManager());
@@ -213,7 +213,7 @@ contract CollateralPool is IICollateralPool, ReentrancyGuard, UUPSUpgradeable, I
      *  f-assets in a way that either preserves the pool collateral ratio or keeps it above exit CR
      * @param _tokenShare                   The amount of pool tokens to be liquidated
      *                                      Must be positive and smaller or equal to the sender's token balance
-     * @param _redeemToCollateral           Specifies if redeemed f-assets should be exchanged to vault collateral
+     * @param _redeemToCollateral           Specifies if redeemed f-assets should be exchanged to vault collateral (stablecoin)
      *                                      by the agent
      * @param _redeemerUnderlyingAddress    Redeemer's address on the underlying chain
      * @param _executor                     The account that is allowed to execute redemption default
@@ -266,50 +266,64 @@ contract CollateralPool is IICollateralPool, ReentrancyGuard, UUPSUpgradeable, I
 
     // slither-disable-next-line reentrancy-eth         // guarded by nonReentrant
     function _selfCloseExitTo(
-        uint256 _tokenShare,
+        uint256 _tokenShare, // CPT
         bool _redeemToCollateral,
-        address payable _recipient,
-        string memory _redeemerUnderlyingAddress,
+        address payable _recipient, // msg.sender
+        string memory _redeemerUnderlyingAddress, // @audit what if redeemer provides invalid address (such as agent's own adddress, zero address, causing this to fail?)
         address payable _executor
     )
         private
     {
         require(_tokenShare > 0, TokenShareIsZero());
         require(_tokenShare <= token.balanceOf(msg.sender), TokenBalanceTooLow());
+
         _requireMinTokenSupplyAfterExit(_tokenShare);
-        // token.totalSupply() >= token.balanceOf(msg.sender) >= _tokenShare > 0
+
         uint256 natShare = totalCollateral.mulDiv(_tokenShare, token.totalSupply());
         require(natShare > 0, SentAmountTooLow());
+
         _requireMinNatSupplyAfterExit(natShare);
+
+        // Returns max amount that can be redeemed from the agent in single txn in UBA
         uint256 maxAgentRedemption = assetManager.maxRedemptionFromAgent(agentVault);
         uint256 requiredFAssets = _getFAssetRequiredToNotSpoilCR(natShare);
+
         // Rare case: if agent has too many low-valued open tickets they can't redeem the requiredFAssets
         // in one transaction. In that case, we revert and the user should retry with lower amount.
         require(maxAgentRedemption > requiredFAssets, RedemptionRequiresClosingTooManyTickets());
+
         // get owner f-asset fees to be spent (maximize fee withdrawal to cover the potentially necessary f-assets)
         uint256 debtFAssetFeeShare = _tokensToVirtualFeeShare(_tokenShare);
+
         // transfer the owner's fassets that will be redeemed
         require(fAsset.allowance(msg.sender, address(this)) >= requiredFAssets, FAssetAllowanceTooSmall());
         fAsset.safeTransferFrom(msg.sender, address(this), requiredFAssets);
+
         // redeem f-assets if necessary
         bool returnFunds = true;
         if (requiredFAssets > 0) {
             if (requiredFAssets < assetManager.lotSize() || _redeemToCollateral) {
                 assetManager.redeemFromAgentInCollateral(agentVault, _recipient, requiredFAssets);
-            } else {
+            }
+            else {
                 returnFunds = _executor == address(0);
                 // pass `msg.value` to `redeemFromAgent` for the executor fee if `_executor` is set
                 assetManager.redeemFromAgent{ value: returnFunds ? 0 : msg.value }(
                     agentVault, _recipient, requiredFAssets, _redeemerUnderlyingAddress, _executor);
             }
         }
+
         _deleteFAssetFeeDebt(msg.sender, debtFAssetFeeShare);
+
         token.burn(msg.sender, _tokenShare, false);
+
         _withdrawWNatTo(_recipient, natShare);
+
         if (returnFunds) {
             // return any NAT included by mistake to the recipient
             Transfers.transferNAT(_recipient, msg.value);
         }
+
         // emit event
         emit CPSelfCloseExited(msg.sender, _tokenShare, natShare, requiredFAssets);
     }
@@ -452,13 +466,16 @@ contract CollateralPool is IICollateralPool, ReentrancyGuard, UUPSUpgradeable, I
         uint256 exitCR = _safeExitCR();
         uint256 backedFAssets = _agentBackedFAssets();
         uint256 resultWithoutRounding;
+
         if (_isAboveCR(assetPrice, backedFAssets, totalCollateral, exitCR)) {
             // f-asset required for CR to stay above exitCR (might not be needed)
             // solve (N - n) / (p / q (F - f)) >= cr get f = max(0, F - q (N - n) / (p cr))
             // assetPrice.mul > 0, exitCR > 1
             resultWithoutRounding = MathUtils.subOrZero(backedFAssets,
                 assetPrice.div * (totalCollateral - _natShare) * SafePct.MAX_BIPS / (assetPrice.mul * exitCR));
-        } else {
+        }
+
+        else {
             // f-asset that preserves pool CR (assume poolNatBalance >= natShare > 0)
             // solve (N - n) / (F - f) = N / F get f = n F / N
             resultWithoutRounding = backedFAssets.mulDivRoundUp(_natShare, totalCollateral);
@@ -824,15 +841,20 @@ contract CollateralPool is IICollateralPool, ReentrancyGuard, UUPSUpgradeable, I
         IRewardManager.RewardClaimWithProof[] calldata _proofs
     )
         external
-        onlyAgent
+        onlyAgent // @pattern Auth check: only agent can call this function
         nonReentrant
         returns (uint256)
     {
         uint256 balanceBefore = wNat.balanceOf(address(this));
+        // Transfers wNAT to this contract
+        // true: rewards tokens are wrapped (Converted to wNat)
         _rewardManager.claim(address(this), payable(address(this)), _lastRewardEpoch, true, _proofs);
+
         uint256 balanceAfter = wNat.balanceOf(address(this));
         uint256 claimed = balanceAfter - balanceBefore;
         totalCollateral += claimed;
+
+        // Tries to pull agent out of liquidation
         assetManager.updateCollateral(agentVault, wNat);
         emit CPClaimedReward(claimed, 1);
         return claimed;
@@ -843,15 +865,18 @@ contract CollateralPool is IICollateralPool, ReentrancyGuard, UUPSUpgradeable, I
         uint256 _month
     )
         external
-        onlyAgent
+        onlyAgent // Auth check
         nonReentrant
         returns(uint256)
     {
         uint256 balanceBefore = wNat.balanceOf(address(this));
+        // true: bool _wrap -> Wraps rewards immediately
         _distribution.claim(address(this), payable(address(this)), _month, true);
+
         uint256 balanceAfter = wNat.balanceOf(address(this));
         uint256 claimed = balanceAfter - balanceBefore;
         totalCollateral += claimed;
+
         assetManager.updateCollateral(agentVault, wNat);
         emit CPClaimedReward(claimed, 0);
         return claimed;

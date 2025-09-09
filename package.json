@@ -107,7 +107,7 @@
     "eslint": "^9.29.0",
     "eth-sig-util": "3.0.1",
     "ethereumjs-util": "7.1.5",
-    "glob": "11.0.3",
+    "glob": "9.3.0",
     "hardhat": "2.24.3",
     "hardhat-contract-sizer": "2.10.0",
     "hardhat-gas-reporter": "1.0.9",

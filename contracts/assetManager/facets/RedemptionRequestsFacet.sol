@@ -172,9 +172,11 @@ contract RedemptionRequestsFacet is AssetManagerBase, ReentrancyGuard {
     {
         Agent.State storage agent = Agent.get(_agentVault);
         AssetManagerState.State storage state = AssetManagerState.get();
+
         uint64 maxRedemptionAMG = agent.dustAMG;
         uint256 maxRedeemedTickets = Globals.getSettings().maxRedeemedTickets;
         uint64 ticketId = state.redemptionQueue.agents[agent.vaultAddress()].firstTicketId;
+
         for (uint256 i = 0; ticketId != 0 && i < maxRedeemedTickets; i++) {
             RedemptionQueue.Ticket storage ticket = state.redemptionQueue.getTicket(ticketId);
             maxRedemptionAMG += ticket.valueAMG;
