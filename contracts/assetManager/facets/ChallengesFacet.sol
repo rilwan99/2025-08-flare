@@ -49,6 +49,7 @@ contract ChallengesFacet is AssetManagerBase, ReentrancyGuard {
      * @param _agentVault agent vault address
      */
     function illegalPaymentChallenge(
+        // can be Agent's legitimate core vault payment or incorrectly payment from self-close exit
         IBalanceDecreasingTransaction.Proof calldata _payment,
         address _agentVault
     )
@@ -58,14 +59,18 @@ contract ChallengesFacet is AssetManagerBase, ReentrancyGuard {
         AssetManagerState.State storage state = AssetManagerState.get();
         Agent.State storage agent = Agent.get(_agentVault);
         _validateAgentStatus(agent);
+
         // verify transaction
         TransactionAttestation.verifyBalanceDecreasingTransaction(_payment);
+
         // check the payment originates from agent's address
         require(_payment.data.responseBody.sourceAddressHash == agent.underlyingAddressHash,
             ChallengeNotAgentsAddress());
+
         // check that proof of this tx wasn't used before - otherwise we could
         // trigger liquidation for already proved redemption payments
         require(!state.paymentConfirmations.transactionConfirmed(_payment), ChallengeTransactionAlreadyConfirmed());
+
         // check that payment reference is invalid (paymentReference == 0 is always invalid payment)
         bytes32 paymentReference = _payment.data.responseBody.standardPaymentReference;
         if (paymentReference != 0) {
@@ -80,6 +85,7 @@ contract ChallengesFacet is AssetManagerBase, ReentrancyGuard {
                 bool redemptionActive = redemption.agentVault == _agentVault && Redemptions.isOpen(redemption);
                 require(!redemptionActive, MatchingRedemptionActive());
             }
+
             if (PaymentReference.isValid(paymentReference, PaymentReference.ANNOUNCED_WITHDRAWAL)) {
                 uint256 announcementId = PaymentReference.decodeId(paymentReference);
                 // valid announced withdrawal cannot have announcementId == 0 and must match the agent's announced id

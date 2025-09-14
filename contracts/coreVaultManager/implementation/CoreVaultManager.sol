@@ -197,7 +197,8 @@ contract CoreVaultManager is
             cancelableTransferRequestsAmount += _amount;
             cancelableTransferRequests.push(nextTransferRequestId);
             newTransferRequest = true;
-        } else {
+        }
+        else {
             uint256 index = 0;
             while (index < nonCancelableTransferRequests.length) {
                 TransferRequest storage req = transferRequestById[nonCancelableTransferRequests[index]];

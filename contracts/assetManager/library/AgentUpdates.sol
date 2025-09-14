@@ -31,13 +31,17 @@ library AgentUpdates {
         internal
     {
         AssetManagerState.State storage state = AssetManagerState.get();
+        // NOTE: starts from 0 (returns a valid index)
         uint256 tokenIndex = CollateralTypes.getIndex(CollateralType.Class.VAULT, _token);
         CollateralTypeInt.Data storage collateral = state.collateralTokens[tokenIndex];
         assert(collateral.collateralClass == CollateralType.Class.VAULT);
+
         // agent should never switch to a deprecated or already invalid collateral
         require(collateral.validUntil == 0, CollateralDeprecated());
+
         // set the new index
         _agent.vaultCollateralIndex = tokenIndex.toUint16();
+
         // check there is enough collateral for current mintings
         Collateral.Data memory switchCollateralData = AgentCollateral.agentVaultCollateralData(_agent);
         uint256 crBIPS = AgentCollateral.collateralRatioBIPS(switchCollateralData, _agent);

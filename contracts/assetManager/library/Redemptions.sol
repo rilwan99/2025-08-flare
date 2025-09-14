@@ -28,34 +28,41 @@ library Redemptions {
         returns (uint64 _closedAMG, uint256 _closedUBA)
     {
         AssetManagerState.State storage state = AssetManagerState.get();
+
         // redemption tickets
         uint256 maxRedeemedTickets = Globals.getSettings().maxRedeemedTickets;
         uint64 lotSize = Globals.getSettings().lotSizeAMG;
+
         for (uint256 i = 0; i < maxRedeemedTickets && _closedAMG < _amountAMG; i++) {
             // each loop, firstTicketId will change since we delete the first ticket
             uint64 ticketId = state.redemptionQueue.agents[_agent.vaultAddress()].firstTicketId;
             if (ticketId == 0) {
                 break;  // no more tickets for this agent
             }
+
             RedemptionQueue.Ticket storage ticket = state.redemptionQueue.getTicket(ticketId);
             uint64 maxTicketRedeemAMG = ticket.valueAMG + _agent.dustAMG;
             maxTicketRedeemAMG -= maxTicketRedeemAMG % lotSize; // round down to whole lots
             uint64 ticketRedeemAMG = SafeMath64.min64(_amountAMG - _closedAMG, maxTicketRedeemAMG);
-            // only remove from tickets and add to total, do everything else after the loop
+
+            // deletes redemption ticket OR updates ticket.valueAMG & agent.dustAMG
             removeFromTicket(ticketId, ticketRedeemAMG);
             _closedAMG += ticketRedeemAMG;
         }
+
         // now close the dust if anything remains (e.g. if there were not enough tickets to redeem)
         uint64 closeDustAMG = SafeMath64.min64(_amountAMG - _closedAMG, _agent.dustAMG);
         if (closeDustAMG > 0) {
             _closedAMG += closeDustAMG;
             AgentBacking.decreaseDust(_agent, closeDustAMG);
         }
+
         // self-close or liquidation is one step, so we can release minted assets without redeeming step
         if (_immediatelyReleaseMinted) {
             AgentBacking.releaseMintedAssets(_agent, _closedAMG);
         }
-        // return
+
+        // mutiply by assetMintingGranularityUBA
         _closedUBA = Conversion.convertAmgToUBA(_closedAMG);
     }
 
@@ -69,13 +76,16 @@ library Redemptions {
         RedemptionQueue.Ticket storage ticket = redemptionQueue.getTicket(_redemptionTicketId);
         Agent.State storage agent = Agent.get(ticket.agentVault);
         uint64 lotSize = Globals.getSettings().lotSizeAMG;
+
         uint64 remainingAMG = ticket.valueAMG + agent.dustAMG - _redeemedAMG;
         uint64 remainingAMGDust = remainingAMG % lotSize;
         uint64 remainingAMGLots = remainingAMG - remainingAMGDust;
+
         if (remainingAMGLots == 0) {
             redemptionQueue.deleteRedemptionTicket(_redemptionTicketId);
             emit IAssetManagerEvents.RedemptionTicketDeleted(agent.vaultAddress(), _redemptionTicketId);
-        } else if (remainingAMGLots != ticket.valueAMG) {
+        }
+        else if (remainingAMGLots != ticket.valueAMG) {
             ticket.valueAMG = remainingAMGLots;
             uint256 remainingUBA = Conversion.convertAmgToUBA(remainingAMGLots);
             emit IAssetManagerEvents.RedemptionTicketUpdated(agent.vaultAddress(), _redemptionTicketId, remainingUBA);

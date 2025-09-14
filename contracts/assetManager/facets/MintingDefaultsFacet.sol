@@ -58,9 +58,11 @@ contract MintingDefaultsFacet is AssetManagerBase, ReentrancyGuard {
             _proof.data.requestBody.destinationAddressHash == agent.underlyingAddressHash &&
             _proof.data.requestBody.amount == underlyingValueUBA + crt.underlyingFeeUBA,
             MintingNonPaymentMismatch());
+
         require(_proof.data.responseBody.firstOverflowBlockNumber > crt.lastUnderlyingBlock &&
             _proof.data.responseBody.firstOverflowBlockTimestamp > crt.lastUnderlyingTimestamp,
             MintingDefaultTooEarly());
+
         require(_proof.data.requestBody.minimalBlockNumber <= crt.firstUnderlyingBlock,
             MintingNonPaymentProofWindowTooShort());
         // send event
@@ -98,23 +100,30 @@ contract MintingDefaultsFacet is AssetManagerBase, ReentrancyGuard {
         CollateralReservation.Data storage crt = Minting.getCollateralReservation(_crtId, true);
         Agent.State storage agent = Agent.get(crt.agentVault);
         Agents.requireAgentVaultOwner(agent);
+
         // verify proof
         TransactionAttestation.verifyConfirmedBlockHeightExists(_proof);
+
         // enough time must pass so that proofs are no longer available
         require(_proof.data.responseBody.lowestQueryWindowBlockNumber > crt.lastUnderlyingBlock
             && _proof.data.responseBody.lowestQueryWindowBlockTimestamp > crt.lastUnderlyingTimestamp
             && _proof.data.responseBody.lowestQueryWindowBlockTimestamp + settings.attestationWindowSeconds <=
                 _proof.data.responseBody.blockTimestamp,
             CannotUnstickMintingYet());
+
         // burn collateral reservation fee (guarded against reentrancy)
         Globals.getBurnAddress().transfer(crt.reservationFeeNatWei + crt.executorFeeNatGWei * Conversion.GWEI);
+
         // burn reserved collateral at market price
+        // @audit why do we use current market price instead of price during collateral reservtion txn? Does this have any impact?
         uint256 amgToTokenWeiPrice = Conversion.currentAmgPriceInTokenWei(agent.vaultCollateralIndex);
         uint256 reservedCollateral = Conversion.convertAmgToTokenWei(crt.valueAMG, amgToTokenWeiPrice);
         uint256 burnedNatWei = _burnVaultCollateral(agent, reservedCollateral);
+
         // send event
         uint256 reservedValueUBA = Conversion.convertAmgToUBA(crt.valueAMG) + Minting.calculatePoolFeeUBA(agent, crt);
         emit IAssetManagerEvents.CollateralReservationDeleted(crt.agentVault, crt.minter, _crtId, reservedValueUBA);
+
         // release agent's reserved collateral
         Minting.releaseCollateralReservation(crt, CollateralReservation.Status.EXPIRED);
         // If there is some overpaid NAT, send it back.

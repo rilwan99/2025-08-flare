@@ -21,8 +21,11 @@ contract AgentVaultFactory is IIAgentVaultFactory, IERC165 {
     function create(
         IIAssetManager _assetManager
     ) external returns (IIAgentVault) {
+        // Deploy new ERC1967 Proxy
         ERC1967Proxy proxy = new ERC1967Proxy(implementation, new bytes(0));
         AgentVault agentVault = AgentVault(payable(address(proxy)));
+
+        // Call initialize method()
         agentVault.initialize(_assetManager);
         return agentVault;
     }

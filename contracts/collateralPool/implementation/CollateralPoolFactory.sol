@@ -13,7 +13,7 @@ import {IICollateralPool} from "../../collateralPool/interfaces/IICollateralPool
 contract CollateralPoolFactory is IICollateralPoolFactory, IERC165 {
     using SafeCast for uint256;
 
-    address public implementation;
+    address public implementation; // Points to Implementation address of Collateral Pool
 
     constructor(address _implementation) {
         implementation = _implementation;
@@ -28,7 +28,10 @@ contract CollateralPoolFactory is IICollateralPoolFactory, IERC165 {
         returns (IICollateralPool)
     {
         address fAsset = address(_assetManager.fAsset());
+        // Deploy a proxy which points to the Collateral Pool Implementation address
         ERC1967Proxy proxy = new ERC1967Proxy(implementation, new bytes(0));
+
+        // Create variables (`pool`) which points to the proxy
         CollateralPool pool = CollateralPool(payable(address(proxy)));
         pool.initialize(_agentVault, address(_assetManager), fAsset,
             _settings.poolExitCollateralRatioBIPS.toUint32());

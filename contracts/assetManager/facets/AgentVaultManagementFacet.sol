@@ -54,60 +54,78 @@ contract AgentVaultManagementFacet is AssetManagerBase {
      * @return _agentVault the new agent vault address
      */
     function createAgentVault(
-        IAddressValidity.Proof calldata _addressProof,
+        IAddressValidity.Proof calldata _addressProof, // proof that agent owns underlying address
         AgentSettings.Data calldata _settings
     )
         external
-        onlyAttached
+        onlyAttached // requires asset manager address to be valid/set
         returns (address _agentVault)
     {
         AssetManagerState.State storage state = AssetManagerState.get();
+
         // reserve suffix quickly to prevent griefing attacks by frontrunning agent creation
         // with same suffix, wasting agent owner gas
         _reserveAndValidatePoolTokenSuffix(_settings.poolTokenSuffix);
+
         // can be called from management or work owner address
         address ownerManagementAddress = _getManagementAddress(msg.sender);
+
         // management address must be whitelisted
         Agents.requireWhitelisted(ownerManagementAddress);
+
         // require valid address
         TransactionAttestation.verifyAddressValidity(_addressProof);
         IAddressValidity.ResponseBody memory avb = _addressProof.data.responseBody;
         require(avb.isValid, AddressInvalid());
+
+        // Prevent core vault underlying address to be used as agent underlying address
         require(avb.standardAddressHash != CoreVaultClient.coreVaultUnderlyingAddressHash(), AddressUsedByCoreVault());
         IIAssetManager assetManager = IIAssetManager(address(this));
+
         // create agent vault
         IIAgentVaultFactory agentVaultFactory = IIAgentVaultFactory(Globals.getSettings().agentVaultFactory);
         IIAgentVault agentVault = agentVaultFactory.create(assetManager);
+
         // set initial status
         Agent.State storage agent = Agent.getWithoutCheck(address(agentVault));
         assert(agent.status == Agent.Status.EMPTY);     // state should be empty on creation
         agent.status = Agent.Status.NORMAL;
         agent.ownerManagementAddress = ownerManagementAddress;
+
         // set collateral token types
         agent.setVaultCollateral(_settings.vaultCollateralToken);
         agent.poolCollateralIndex = state.poolCollateralIndex;
+
         // set initial collateral ratios
         agent.setMintingVaultCollateralRatioBIPS(_settings.mintingVaultCollateralRatioBIPS);
         agent.setMintingPoolCollateralRatioBIPS(_settings.mintingPoolCollateralRatioBIPS);
+
         // set minting fee and share
         agent.setFeeBIPS(_settings.feeBIPS);
         agent.setPoolFeeShareBIPS(_settings.poolFeeShareBIPS);
         agent.setBuyFAssetByAgentFactorBIPS(_settings.buyFAssetByAgentFactorBIPS);
+
         // claim the underlying address to make sure no other agent is using it
         state.underlyingAddressOwnership.claimAndTransfer(address(agentVault), avb.standardAddressHash);
+
         // set underlying address
         agent.underlyingAddressString = avb.standardAddress;
         agent.underlyingAddressHash = avb.standardAddressHash;
         agent.underlyingBlockAtCreation = state.currentUnderlyingBlock;
+
         // add collateral pool
         agent.collateralPool = _createCollateralPool(assetManager, address(agentVault), _settings);
+
         // run the pool setters just for validation
         agent.setPoolExitCollateralRatioBIPS(_settings.poolExitCollateralRatioBIPS);
+
         // set redemption pool fee share
         agent.setRedemptionPoolFeeShareBIPS(_settings.redemptionPoolFeeShareBIPS);
+
         // add to the list of all agents
         agent.allAgentsPos = state.allAgents.length.toUint32();
         state.allAgents.push(address(agentVault));
+
         // notify
         _emitAgentVaultCreated(ownerManagementAddress, address(agentVault), agent.collateralPool,
             avb.standardAddress, _settings);
@@ -283,14 +301,17 @@ contract AgentVaultManagementFacet is AssetManagerBase {
         private
     {
         AssetManagerState.State storage state = AssetManagerState.get();
+
         // reserve unique suffix
         require(!state.reservedPoolTokenSuffixes[_suffix], SuffixReserved());
         state.reservedPoolTokenSuffixes[_suffix] = true;
+
         // validate - require only printable ASCII characters (no spaces) and limited length
         bytes memory suffixb = bytes(_suffix);
         uint256 len = suffixb.length;
         require(len >= MIN_SUFFIX_LEN, SuffixInvalidFormat());
         require(len <= MAX_SUFFIX_LEN, SuffixInvalidFormat());
+
         for (uint256 i = 0; i < len; i++) {
             bytes1 ch = suffixb[i];
             // allow A-Z, 0-9 and '-' (but not at start or end)

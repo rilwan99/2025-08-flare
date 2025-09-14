@@ -40,7 +40,9 @@ library TransactionAttestation {
     {
         AssetManagerSettings.Data storage _settings = Globals.getSettings();
         IFdcVerification fdcVerification = IFdcVerification(_settings.fdcVerification);
+        // verify payment from correct source chain
         require(_proof.data.sourceId == _settings.chainId, InvalidChain());
+        // verify attestationType  == "Payment" and proof is valid
         require(fdcVerification.verifyPayment(_proof), LegalPaymentNotProven());
     }
 

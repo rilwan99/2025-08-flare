@@ -11,7 +11,9 @@ library Collateral {
 
     struct Data {
         Kind kind;
+        // represent the amount of tokens
         uint256 fullCollateral;
+        // price ratio that tells us how many wei units of collateral token equals 1 AMG unit
         uint256 amgToTokenWeiPrice;
     }
 

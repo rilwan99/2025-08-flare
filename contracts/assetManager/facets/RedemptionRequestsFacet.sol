@@ -114,22 +114,36 @@ contract RedemptionRequestsFacet is AssetManagerBase, ReentrancyGuard {
         nonReentrant
     {
         Agent.State storage agent = Agent.get(_agentVault);
+        // Auth check: Only collateral Pool can call this function
         Agents.requireCollateralPool(agent);
         require(_amountUBA != 0, RedemptionOfZero());
+
         // close redemption tickets
-        uint64 amountAMG = Conversion.convertUBAToAmg(_amountUBA);
+        uint64 amountAMG = Conversion.convertUBAToAmg(_amountUBA); // divide by assetMintingGranularityUBA
         (uint64 closedAMG, uint256 closedUBA) = Redemptions.closeTickets(agent, amountAMG, false);
+
         // create redemption request
         RedemptionRequests.AgentRedemptionData memory redemption =
             RedemptionRequests.AgentRedemptionData(_agentVault, closedAMG);
+
+        // AgentRedemptionData memory _data,                  redemption
+        // address _redeemer,                                 _receiver
+        // string memory _redeemerUnderlyingAddressString,    _receiverUnderlyingAddress
+        // bool _poolSelfClose,                               true
+        // address payable _executor,                         _executor
+        // uint64 _executorFeeNatGWei,                        (msg.value / Conversion.GWEI).toUint64()
+        // uint64 _additionalPaymentTime,                     0
+        // bool _transferToCoreVault                          false
+
         RedemptionRequests.createRedemptionRequest(redemption, _receiver, _receiverUnderlyingAddress, true,
             _executor, (msg.value / Conversion.GWEI).toUint64(), 0, false);
+
         // burn the closed assets
         Redemptions.burnFAssets(msg.sender, closedUBA);
     }
 
     /**
-     * Burn fassets from  a single agent and get paid in vault collateral by the agent.
+     * Burn fassets from  a single agent and get paid in vault collateral(STABLECOIN) by the agent.
      * Price is FTSO price, multiplied by factor buyFAssetByAgentFactorBIPS (set by agent).
      * Used in self-close exit from the collateral pool when requested or when self-close amount is less than 1 lot.
      * Note: only collateral pool can call this method.
@@ -144,18 +158,25 @@ contract RedemptionRequestsFacet is AssetManagerBase, ReentrancyGuard {
         nonReentrant
     {
         Agent.State storage agent = Agent.get(_agentVault);
+        // auth check: msg.sender needs to be agent's Collateral Pool
         Agents.requireCollateralPool(agent);
         require(_amountUBA != 0, RedemptionOfZero());
+
         // close redemption tickets
-        uint64 amountAMG = Conversion.convertUBAToAmg(_amountUBA);
+        uint64 amountAMG = Conversion.convertUBAToAmg(_amountUBA); // divide by assetMintingGranularityUBA
         (uint64 closedAMG, uint256 closedUBA) = Redemptions.closeTickets(agent, amountAMG, true);
+
         // pay in collateral
         uint256 priceAmgToWei = Conversion.currentAmgPriceInTokenWei(agent.vaultCollateralIndex);
+        // Applies discount, max up to 90%
         uint256 paymentWei = Conversion.convertAmgToTokenWei(closedAMG, priceAmgToWei)
             .mulBips(agent.buyFAssetByAgentFactorBIPS);
+        // @audit uses Math.min(paymentWei, collateral.token.balanceOf(address(vault)));
         AgentPayout.payoutFromVault(agent, _receiver, paymentWei);
+
         emit IAssetManagerEvents.RedeemedInCollateral(_agentVault, _receiver, closedUBA, paymentWei);
         // burn the closed assets
+        // @audit only closedUBA is burned, _amountUBA - closedUBA is still stuck in the CollateralPool.sol
         Redemptions.burnFAssets(msg.sender, closedUBA);
     }
 
@@ -164,6 +185,7 @@ contract RedemptionRequestsFacet is AssetManagerBase, ReentrancyGuard {
      * or liquidation is limited. This means that a single redemption/self close/liquidation is limited.
      * This function calculates the maximum single redemption amount.
      */
+    // @pattern returns agent.dustAMG + sum of all ticket.valueAMG
     function maxRedemptionFromAgent(
         address _agentVault
     )
@@ -182,6 +204,7 @@ contract RedemptionRequestsFacet is AssetManagerBase, ReentrancyGuard {
             maxRedemptionAMG += ticket.valueAMG;
             ticketId = ticket.nextForAgent;
         }
+        // multiply by assetMintingGranularityUBA
         return Conversion.convertAmgToUBA(maxRedemptionAMG);
     }
 

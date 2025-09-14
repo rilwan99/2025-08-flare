@@ -133,24 +133,34 @@ contract CollateralPool is IICollateralPool, ReentrancyGuard, UUPSUpgradeable, I
         nonReentrant
         returns (uint256, uint256)
     {
+        // Validate input amount
         require(msg.value >= MIN_NAT_TO_ENTER, AmountOfNatTooLow());
+
         uint256 totalPoolTokens = token.totalSupply();
         if (totalPoolTokens == 0) {
-            // this conditions are set for keeping a stable token value
+
+            // Will either be 0 or incremented via claimDelegationRewards()/claimAirdropDistribution()
             require(msg.value >= totalCollateral, AmountOfCollateralTooLow());
+
             AssetPrice memory assetPrice = _getAssetPrice();
+            // Ensure msg.value >= value of fasset fees accrued by the pool
             require(msg.value >= totalFAssetFees.mulDiv(assetPrice.mul, assetPrice.div), AmountOfCollateralTooLow());
         }
-        // calculate obtained pool tokens and free f-assets
+
+        // Rounds DOWN and calc amount of CPT tokens to be minted, based on msg.value / totalCollateral
         uint256 tokenShare = _collateralToTokenShare(msg.value);
         require(tokenShare > 0, DepositResultsInZeroTokens());
-        // calculate and create fee debt
+
+        // calculate and create fee debt for user
         uint256 feeDebt = totalPoolTokens > 0 ? _totalVirtualFees().mulDiv(tokenShare, totalPoolTokens) : 0;
         _createFAssetFeeDebt(msg.sender, feeDebt);
-        // deposit collateral
+
+        // @pattern totalCollateral increases by msg.value
         _depositWNat();
+
         // mint pool tokens to the sender
         uint256 timelockExp = token.mint(msg.sender, tokenShare);
+
         // emit event
         emit CPEntered(msg.sender, msg.value, tokenShare, timelockExp);
         return (tokenShare, timelockExp);
@@ -190,19 +200,28 @@ contract CollateralPool is IICollateralPool, ReentrancyGuard, UUPSUpgradeable, I
         private
         returns (uint256)
     {
+        // Validate CPT amount being redeemed
         require(_tokenShare > 0, TokenShareIsZero());
         require(_tokenShare <= token.balanceOf(msg.sender), TokenBalanceTooLow());
+        // Remaining amount of CPT needs to be at least 1 ETH
         _requireMinTokenSupplyAfterExit(_tokenShare);
-        // token.totalSupply() >= token.balanceOf(msg.sender) >= _tokenShare > 0
+
+        // Validate pool remaining NAT balance (1 ETH)
         uint256 natShare = totalCollateral.mulDiv(_tokenShare, token.totalSupply());
         require(natShare > 0, SentAmountTooLow());
         _requireMinNatSupplyAfterExit(natShare);
+
+        // @pattern ensures pool CR stays above minCR/exitCR
         require(_staysAboveExitCR(natShare), CollateralRatioFallsBelowExitCR());
+
         // update the fasset fee debt
         uint256 debtFAssetFeeShare = _tokensToVirtualFeeShare(_tokenShare);
         _deleteFAssetFeeDebt(msg.sender, debtFAssetFeeShare);
+
+        // Burn CPT tokens (_ignoreTimelock:false -> Enforces timelock)
         token.burn(msg.sender, _tokenShare, false);
         _withdrawWNatTo(_recipient, natShare);
+
         // emit event
         emit CPExited(msg.sender, _tokenShare, natShare);
         return natShare;
@@ -268,8 +287,8 @@ contract CollateralPool is IICollateralPool, ReentrancyGuard, UUPSUpgradeable, I
     function _selfCloseExitTo(
         uint256 _tokenShare, // CPT
         bool _redeemToCollateral,
-        address payable _recipient, // msg.sender
-        string memory _redeemerUnderlyingAddress, // @audit what if redeemer provides invalid address (such as agent's own adddress, zero address, causing this to fail?)
+        address payable _recipient, // msg.sender OR user-specified input
+        string memory _redeemerUnderlyingAddress, // @audit missing check for core vault address
         address payable _executor
     )
         private
@@ -277,14 +296,14 @@ contract CollateralPool is IICollateralPool, ReentrancyGuard, UUPSUpgradeable, I
         require(_tokenShare > 0, TokenShareIsZero());
         require(_tokenShare <= token.balanceOf(msg.sender), TokenBalanceTooLow());
 
-        _requireMinTokenSupplyAfterExit(_tokenShare);
+        _requireMinTokenSupplyAfterExit(_tokenShare); // validates at least 1 ETH worth of CPT left
 
         uint256 natShare = totalCollateral.mulDiv(_tokenShare, token.totalSupply());
         require(natShare > 0, SentAmountTooLow());
 
-        _requireMinNatSupplyAfterExit(natShare);
+        _requireMinNatSupplyAfterExit(natShare); // validates at least 1 ETH worth of NAT left
 
-        // Returns max amount that can be redeemed from the agent in single txn in UBA
+        // returns agent.dustAMG + sum of all ticket.valueAMG
         uint256 maxAgentRedemption = assetManager.maxRedemptionFromAgent(agentVault);
         uint256 requiredFAssets = _getFAssetRequiredToNotSpoilCR(natShare);
 
@@ -302,9 +321,15 @@ contract CollateralPool is IICollateralPool, ReentrancyGuard, UUPSUpgradeable, I
         // redeem f-assets if necessary
         bool returnFunds = true;
         if (requiredFAssets > 0) {
+
+            // Users get back Agent Vault Collateral (StableCoin)
+            // @audit if requiredFAssets < assetMintingGranularityUBA, requiredFAssets will be rounded down to 0
+            // lotSize() = lotSizeAMG * assetMintingGranularityUBA
             if (requiredFAssets < assetManager.lotSize() || _redeemToCollateral) {
                 assetManager.redeemFromAgentInCollateral(agentVault, _recipient, requiredFAssets);
             }
+
+            // Users get back underlying asset via creating a redemption request
             else {
                 returnFunds = _executor == address(0);
                 // pass `msg.value` to `redeemFromAgent` for the executor fee if `_executor` is set
@@ -315,6 +340,7 @@ contract CollateralPool is IICollateralPool, ReentrancyGuard, UUPSUpgradeable, I
 
         _deleteFAssetFeeDebt(msg.sender, debtFAssetFeeShare);
 
+        // (_ignoreTimelock:false -> Enforces timelock)
         token.burn(msg.sender, _tokenShare, false);
 
         _withdrawWNatTo(_recipient, natShare);
@@ -419,6 +445,7 @@ contract CollateralPool is IICollateralPool, ReentrancyGuard, UUPSUpgradeable, I
         if (slashedTokens > 0) {
             uint256 debtFAssetFeeShare = _tokensToVirtualFeeShare(slashedTokens);
             _deleteFAssetFeeDebt(agentVault, debtFAssetFeeShare);
+            // (_ignoreTimelock:true -> bypass timelock)
             token.burn(agentVault, slashedTokens, true);
         }
         // transfer collateral to the recipient
@@ -449,7 +476,6 @@ contract CollateralPool is IICollateralPool, ReentrancyGuard, UUPSUpgradeable, I
         if (_tokens == 0) return 0;
         uint256 totalPoolTokens = token.totalSupply();
         assert(_tokens <= totalPoolTokens);
-        // poolTokenSupply >= _tokens AND _tokens > 0 together imply poolTokenSupply != 0
         return _totalVirtualFees().mulDiv(_tokens, totalPoolTokens);
     }
 
@@ -558,6 +584,8 @@ contract CollateralPool is IICollateralPool, ReentrancyGuard, UUPSUpgradeable, I
         return token.totalSupply().mulDiv(freeFassets, _totalVirtualFees());
     }
 
+    // returns a price ratio that represents how much NAT (the native token)
+    // is needed to buy one unit of the underlying asset
     function _getAssetPrice()
         internal view
         returns (AssetPrice memory)
@@ -577,10 +605,14 @@ contract CollateralPool is IICollateralPool, ReentrancyGuard, UUPSUpgradeable, I
         // Invariant: virtualFees >= 0 always (otherwise the following line will revert).
         // Proof: the places where `totalFAssetFees` and `totalFAssetFeeDebt` change are: `enter`,
         // `exit`/`selfCloseExit`, `withdrawFees` and `payFAssetFeeDebt`.
+
         // In `withdrawFees` and `payFAssetFeeDebt`, amounts of `totalFAssetFees` and `totalFAssetFeeDebt`
         // change with opposite sign, so virtualFees is unchanged.
+
         // In `enter`, the `totalFAssetFeeDebt` increases and the other is unchanged, so virtualFees increases.
+
         // Thus the only place where `totalFAssetFeeDebt` and thus virtualFees decreases is in`exit`/`selfCloseExit`.
+
         // The decrease there is by `_tokensToVirtualFeeShare()`, which is virtualFees times a factor
         // `tokenShare/totalTokens`, which is checked to be at most 1.
         return virtualFees.toUint256();
@@ -680,6 +712,7 @@ contract CollateralPool is IICollateralPool, ReentrancyGuard, UUPSUpgradeable, I
         }
     }
 
+    // Directly tranafer wNAT to recipient
     function _transferWNatTo(
         address _to,
         uint256 _amount
@@ -692,6 +725,7 @@ contract CollateralPool is IICollateralPool, ReentrancyGuard, UUPSUpgradeable, I
         }
     }
 
+    // Unwrap wNAT into NAT and transfer to recipient
     function _withdrawWNatTo(
         address payable _recipient,
         uint256 _amount

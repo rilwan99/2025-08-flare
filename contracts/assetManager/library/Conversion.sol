@@ -46,10 +46,13 @@ library Conversion {
         AssetManagerSettings.Data storage settings = Globals.getSettings();
         (uint256 ftsoPrice, uint256 assetTimestamp, uint256 tokenTimestamp) =
             currentAmgPriceInTokenWeiWithTs(_token, false);
+
         (uint256 trustedPrice, uint256 assetTimestampTrusted, uint256 tokenTimestampTrusted) =
             currentAmgPriceInTokenWeiWithTs(_token, true);
+
         bool trustedPriceFresh = tokenTimestampTrusted + settings.maxTrustedPriceAgeSeconds >= tokenTimestamp
                 && assetTimestampTrusted + settings.maxTrustedPriceAgeSeconds >= assetTimestamp;
+
         _ftsoPrice = ftsoPrice;
         _trustedPrice = trustedPriceFresh ? trustedPrice : ftsoPrice;
     }

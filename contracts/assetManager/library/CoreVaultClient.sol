@@ -97,6 +97,7 @@ library CoreVaultClient {
         internal view
         returns (uint256 _maximumTransferAMG, uint256 _minimumLeftAmountAMG)
     {
+        // gets the minimum amount of underlying the agent needs to hold across all collateral types
         _minimumLeftAmountAMG = _minimumRemainingAfterTransferAMG(_agent);
         _maximumTransferAMG = MathUtils.subOrZero(_agent.mintedAMG, _minimumLeftAmountAMG);
     }
@@ -151,6 +152,7 @@ library CoreVaultClient {
         return state.coreVaultManager.coreVaultAddressHash();
     }
 
+    // @pattern gets the minimum amount of underlying the agent needs to hold across all collateral types
     function _minimumRemainingAfterTransferAMG(
         Agent.State storage _agent
     )
@@ -172,7 +174,9 @@ library CoreVaultClient {
         returns (uint256)
     {
         State storage state = getState();
+        // Gets the CR that needs to be maintained for each kind of collateral (VAULT, POOL, AGENT_POOL)
         (, uint256 systemMinCrBIPS) = AgentCollateral.mintingMinCollateralRatio(_agent, _data.kind);
+
         uint256 collateralEquivAMG = Conversion.convertTokenWeiToAMG(_data.fullCollateral, _data.amgToTokenWeiPrice);
         uint256 maxSupportedAMG = collateralEquivAMG.mulDiv(SafePct.MAX_BIPS, systemMinCrBIPS);
         return maxSupportedAMG.mulBips(state.minimumAmountLeftBIPS);

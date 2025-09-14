@@ -209,11 +209,14 @@ library AgentCollateral {
             uint256 mintingPoolHoldingsRequiredBIPS = Globals.getSettings().mintingPoolHoldingsRequiredBIPS;
             _systemMinCollateralRatioBIPS = mintingPoolHoldingsRequiredBIPS;
             _mintingMinCollateralRatioBIPS = mintingPoolHoldingsRequiredBIPS;
-        } else if (_kind == Collateral.Kind.POOL) {
+        }
+        else if (_kind == Collateral.Kind.POOL) {
             _systemMinCollateralRatioBIPS = _agent.getPoolCollateral().minCollateralRatioBIPS;
             _mintingMinCollateralRatioBIPS =
                 Math.max(_agent.mintingPoolCollateralRatioBIPS, _systemMinCollateralRatioBIPS);
-        } else {
+        }
+        // VAULT
+        else {
             _systemMinCollateralRatioBIPS = _agent.getVaultCollateral().minCollateralRatioBIPS;
             // agent's minCollateralRatioBIPS must be greater than minCollateralRatioBIPS when set, but
             // minCollateralRatioBIPS can change later so we always use the max of both

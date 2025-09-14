@@ -27,8 +27,8 @@ contract FdcVerificationMock is IFdcVerification {
     {
         return _proof.data.attestationType == bytes32("Payment") &&
             _proof.merkleProof.verifyCalldata(
-                relay.merkleRoots(fdcProtocolId, _proof.data.votingRound),
-                keccak256(abi.encode(_proof.data))
+                relay.merkleRoots(fdcProtocolId, _proof.data.votingRound), // root
+                keccak256(abi.encode(_proof.data)) // leaf
             );
     }
 
