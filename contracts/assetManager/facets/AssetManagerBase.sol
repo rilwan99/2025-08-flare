@@ -28,6 +28,7 @@ abstract contract AssetManagerBase {
         _;
     }
 
+    // msg.sender needs to be ownerManagementAddress or registered work address in AgentOwnerRegistry
     modifier onlyAgentVaultOwner(address _agentVault) {
         Agents.requireAgentVaultOwner(_agentVault);
         _;

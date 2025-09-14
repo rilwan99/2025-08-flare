@@ -105,7 +105,7 @@ library Liquidation {
     // assumed: agentStatus == LIQUIDATION/FULL_LIQUIDATION
     function maxLiquidationAmountAMG(
         Agent.State storage _agent,
-        uint256 _collateralRatioBIPS,
+        uint256 _collateralRatioBIPS, // CURRENT Vault CR or Pool CR
         uint256 _factorBIPS,
         Collateral.Kind _collateralKind
     )

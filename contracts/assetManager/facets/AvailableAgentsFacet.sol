@@ -43,13 +43,16 @@ contract AvailableAgentsFacet is AssetManagerBase {
         Agent.State storage agent = Agent.get(_agentVault);
         require(agent.status == Agent.Status.NORMAL, InvalidAgentStatus());
         require(agent.availableAgentsPos == 0, AgentAlreadyAvailable());
+
         // check that there is enough free collateral for at least one lot
         Collateral.CombinedData memory collateralData = AgentCollateral.combinedData(agent);
         uint256 freeCollateralLots = collateralData.freeCollateralLots(agent);
         require(freeCollateralLots >= 1, NotEnoughFreeCollateral());
+
         // add to queue
         state.availableAgents.push(_agentVault);
         agent.availableAgentsPos = state.availableAgents.length.toUint32();     // index+1 (0=not in list)
+
         emit IAssetManagerEvents.AgentAvailable(_agentVault, agent.feeBIPS,
             agent.mintingVaultCollateralRatioBIPS, agent.mintingPoolCollateralRatioBIPS, freeCollateralLots);
     }

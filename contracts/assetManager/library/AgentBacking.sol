@@ -65,6 +65,7 @@ library AgentBacking {
         uint64 valueWithDustAMG = _agent.dustAMG + _valueAMG;
         uint64 newDustAMG = valueWithDustAMG % settings.lotSizeAMG;
         uint64 ticketValueAMG = valueWithDustAMG - newDustAMG;
+
         // create ticket and change dust
         if (ticketValueAMG > 0) {
             createRedemptionTicket(_agent, ticketValueAMG);
@@ -80,15 +81,18 @@ library AgentBacking {
     {
         AssetManagerState.State storage state = AssetManagerState.get();
         if (_ticketValueAMG == 0) return;
+
         address vaultAddress = _agent.vaultAddress();
         uint64 lastTicketId = state.redemptionQueue.lastTicketId;
         RedemptionQueue.Ticket storage lastTicket = state.redemptionQueue.getTicket(lastTicketId);
+
         if (lastTicket.agentVault == vaultAddress) {
             // last ticket is from the same agent - merge the new ticket with the last
             lastTicket.valueAMG += _ticketValueAMG;
             uint256 ticketValueUBA = Conversion.convertAmgToUBA(lastTicket.valueAMG);
             emit IAssetManagerEvents.RedemptionTicketUpdated(vaultAddress, lastTicketId, ticketValueUBA);
-        } else {
+        }
+        else {
             // either queue is empty or the last ticket belongs to another agent - create new ticket
             uint64 ticketId = state.redemptionQueue.createRedemptionTicket(vaultAddress, _ticketValueAMG);
             uint256 ticketValueUBA = Conversion.convertAmgToUBA(_ticketValueAMG);

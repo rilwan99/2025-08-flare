@@ -112,6 +112,7 @@ contract AgentVault is ReentrancyGuard, UUPSUpgradeable, IIAgentVault, IERC165 {
 
     // Allow transferring a token, airdropped to the agent vault, to the owner (management address).
     // Doesn't work for collateral tokens because this would allow withdrawing the locked collateral.
+    // @note cannot transfer both Agent Vault token (Stablecoin) or Agent CPT
     function transferExternalToken(IERC20 _token, uint256 _amount)
         external override
         onlyOwner

@@ -134,7 +134,9 @@ contract RedemptionConfirmationsFacet is AssetManagerBase, ReentrancyGuard {
         }
 
         // agent has finished with redemption - account for used underlying balance and free the remainder
+        // @audit look into the use of (negative how can it be manipulated,etc)
         UnderlyingBalance.updateBalance(agent, -_payment.data.responseBody.spentAmount);
+
         // record source decreasing transaction so that it cannot be challenged
         AssetManagerState.State storage state = AssetManagerState.get();
         state.paymentConfirmations.confirmSourceDecreasingTransaction(_payment);

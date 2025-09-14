@@ -24,6 +24,7 @@ library SettingsUpdater {
         uint256 lastUpdate = _state.lastUpdate[_action];
         require(lastUpdate == 0 || block.timestamp >= lastUpdate + settings.minUpdateRepeatTimeSeconds,
             TooCloseToPreviousUpdate());
+
         _state.lastUpdate[_action] = block.timestamp;
     }
 

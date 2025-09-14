@@ -76,21 +76,27 @@ contract LiquidationFacet is AssetManagerBase, ReentrancyGuard {
         Agent.State storage agent = Agent.get(_agentVault);
         // calculate both CRs
         Liquidation.CRData memory cr = Liquidation.getCollateralRatiosBIPS(agent);
+
         // allow one-step liquidation (without calling startLiquidation first)
         bool inLiquidation = _startLiquidation(agent, cr);
         require(inLiquidation, NotInLiquidation());
+
         // liquidate redemption tickets
         (uint64 liquidatedAmountAMG, uint256 payoutC1Wei, uint256 payoutPoolWei) =
             _performLiquidation(agent, cr, Conversion.convertUBAToAmg(_amountUBA));
+
         _liquidatedAmountUBA = Conversion.convertAmgToUBA(liquidatedAmountAMG);
+
         // pay the liquidator
         if (payoutC1Wei > 0) {
             _amountPaidVault = AgentPayout.payoutFromVault(agent, msg.sender, payoutC1Wei);
         }
+
         if (payoutPoolWei > 0) {
             uint256 agentResponsibilityWei = _agentResponsibilityWei(agent, payoutPoolWei);
             _amountPaidPool = AgentPayout.payoutFromPool(agent, msg.sender, payoutPoolWei, agentResponsibilityWei);
         }
+
         // if the agent was already safe due to price changes, there should be no LiquidationPerformed event
         // we do not revert, because it still marks agent as healthy (so there will still be a LiquidationEnded event)
         if (_liquidatedAmountUBA > 0) {
@@ -100,6 +106,7 @@ contract LiquidationFacet is AssetManagerBase, ReentrancyGuard {
             emit IAssetManagerEvents.LiquidationPerformed(_agentVault, msg.sender,
                 _liquidatedAmountUBA, _amountPaidVault, _amountPaidPool);
         }
+
         // try to pull agent out of liquidation
         Liquidation.endLiquidationIfHealthy(agent);
     }
@@ -140,7 +147,8 @@ contract LiquidationFacet is AssetManagerBase, ReentrancyGuard {
         Agent.Status status = _agent.status;
         if (status == Agent.Status.LIQUIDATION || status == Agent.Status.FULL_LIQUIDATION) {
             _inLiquidation = true;
-        } else if (status != Agent.Status.NORMAL) {
+        }
+        else if (status != Agent.Status.NORMAL) {
             // if agent is not in normal status, it cannot be liquidated
             revert LiquidationNotPossible(Agents.getAgentStatus(_agent));
         }
@@ -150,10 +158,12 @@ contract LiquidationFacet is AssetManagerBase, ReentrancyGuard {
         if (vaultUnderwater) {
             _agent.collateralsUnderwater |= Agent.LF_VAULT;
         }
+
         bool poolUnderwater = _isCollateralUnderwater(_cr.poolCR, _agent.poolCollateralIndex);
         if (poolUnderwater) {
             _agent.collateralsUnderwater |= Agent.LF_POOL;
         }
+
         // if not in liquidation yet, check if any collateral is underwater and start liquidation
         if (!_inLiquidation && (vaultUnderwater || poolUnderwater)) {
             _inLiquidation = true;
@@ -186,13 +196,17 @@ contract LiquidationFacet is AssetManagerBase, ReentrancyGuard {
         // split liquidation payment between agent vault and pool
         (uint256 vaultFactor, uint256 poolFactor) =
             LiquidationPaymentStrategy.currentLiquidationFactorBIPS(_agent, _cr.vaultCR, _cr.poolCR);
+
         // calculate liquidation amount
+        // @audit why do we use math.max() and then max.min() in this way?
         uint256 maxLiquidatedAMG = Math.max(
             Liquidation.maxLiquidationAmountAMG(_agent, _cr.vaultCR, vaultFactor, Collateral.Kind.VAULT),
             Liquidation.maxLiquidationAmountAMG(_agent, _cr.poolCR, poolFactor, Collateral.Kind.POOL));
         uint64 amountToLiquidateAMG = Math.min(maxLiquidatedAMG, _amountAMG).toUint64();
+
         // liquidate redemption tickets
         (_liquidatedAMG,) = Redemptions.closeTickets(_agent, amountToLiquidateAMG, true);
+
         // calculate payouts to liquidator
         _payoutC1Wei =
             Conversion.convertAmgToTokenWei(uint256(_liquidatedAMG).mulBips(vaultFactor), _cr.amgToC1WeiPrice);

@@ -66,8 +66,10 @@ contract MintingFacet is AssetManagerBase, ReentrancyGuard {
     {
         CollateralReservation.Data storage crt = Minting.getCollateralReservation(_crtId, true);
         Agent.State storage agent = Agent.get(crt.agentVault);
+
         // verify transaction
         TransactionAttestation.verifyPaymentSuccess(_payment);
+
         // minter or agent can present the proof - agent may do it to unlock the collateral if minter
         // becomes unresponsive
         require(msg.sender == crt.minter || msg.sender == crt.executor || Agents.isOwner(agent, msg.sender),
@@ -76,24 +78,32 @@ contract MintingFacet is AssetManagerBase, ReentrancyGuard {
             InvalidMintingReference());
         require(_payment.data.responseBody.receivingAddressHash == agent.underlyingAddressHash,
             NotMintingAgentsAddress());
+
         uint256 mintValueUBA = Conversion.convertAmgToUBA(crt.valueAMG);
         require(_payment.data.responseBody.receivedAmount >= SafeCast.toInt256(mintValueUBA + crt.underlyingFeeUBA),
             MintingPaymentTooSmall());
+
         // we do not allow payments before the underlying block at requests, because the payer should have guessed
         // the payment reference, which is good for nothing except attack attempts
         require(_payment.data.responseBody.blockNumber >= crt.firstUnderlyingBlock,
             MintingPaymentTooOld());
+
         // mark payment used
         AssetManagerState.get().paymentConfirmations.confirmIncomingPayment(_payment);
+
         // execute minting
         _performMinting(agent, MintingType.PUBLIC, _crtId, crt.minter, crt.valueAMG,
             uint256(_payment.data.responseBody.receivedAmount), Minting.calculatePoolFeeUBA(agent, crt));
+
         // update underlying block
         UnderlyingBlockUpdater.updateCurrentBlockForVerifiedPayment(_payment);
+
         // release agent's reserved collateral
         Minting.releaseCollateralReservation(crt, CollateralReservation.Status.SUCCESSFUL);
+
         // pay the executor if they executed the minting
         Minting.payOrBurnExecutorFee(crt);
+
         // share collateral reservation fee between the agent's vault and pool
         Minting.distributeCollateralReservationFee(agent, crt.reservationFeeNatWei);
     }
@@ -207,19 +217,23 @@ contract MintingFacet is AssetManagerBase, ReentrancyGuard {
     {
         uint64 poolFeeAMG = Conversion.convertUBAToAmg(_poolFeeUBA);
         AgentBacking.createNewMinting(_agent, _mintValueAMG + poolFeeAMG);
+
         // update agent balance with deposited amount (received amount is 0 in mintFromFreeUnderlying)
         UnderlyingBalance.increaseBalance(_agent, _receivedAmountUBA);
+
         // perform minting
         uint256 mintValueUBA = Conversion.convertAmgToUBA(_mintValueAMG);
         Globals.getFAsset().mint(_minter, mintValueUBA);
         Globals.getFAsset().mint(address(_agent.collateralPool), _poolFeeUBA);
         _agent.collateralPool.fAssetFeeDeposited(_poolFeeUBA);
+
         // notify
         if (_mintingType == MintingType.PUBLIC) {
             uint256 agentFeeUBA = _receivedAmountUBA - mintValueUBA - _poolFeeUBA;
             emit IAssetManagerEvents.MintingExecuted(_agent.vaultAddress(), _crtId,
                 mintValueUBA, agentFeeUBA, _poolFeeUBA);
-        } else {
+        }
+        else {
             bool fromFreeUnderlying = _mintingType == MintingType.FROM_FREE_UNDERLYING;
             emit IAssetManagerEvents.SelfMint(_agent.vaultAddress(), fromFreeUnderlying,
                 mintValueUBA, _receivedAmountUBA, _poolFeeUBA);

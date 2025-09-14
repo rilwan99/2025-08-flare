@@ -66,49 +66,64 @@ contract CollateralReservationsFacet is AssetManagerBase, ReentrancyGuard {
         returns (uint256 _collateralReservationId)
     {
         Agent.State storage agent = Agent.get(_agentVault);
+        // Verifies that _agent.ownerManagementAddress is whitelisted in Global AgentOwner Registry
         Agents.requireWhitelistedAgentVaultOwner(agent);
+
         Collateral.CombinedData memory collateralData = AgentCollateral.combinedData(agent);
         AssetManagerState.State storage state = AssetManagerState.get();
+
         require(state.mintingPausedAt == 0, MintingPaused());
+
         require(agent.availableAgentsPos != 0 || agent.alwaysAllowedMinters.contains(msg.sender),
             AgentNotInMintQueue());
+
         require(_lots > 0, CannotMintZeroLots());
         require(agent.status == Agent.Status.NORMAL, InvalidAgentStatus());
         require(collateralData.freeCollateralLots(agent) >= _lots, NotEnoughFreeCollateral());
         require(_maxMintingFeeBIPS >= agent.feeBIPS, AgentsFeeTooHigh());
+
         uint64 valueAMG = Conversion.convertLotsToAMG(_lots);
         _reserveCollateral(agent, valueAMG + _currentPoolFeeAMG(agent, valueAMG));
+
         // - only charge reservation fee for public minting, not for alwaysAllowedMinters on non-public agent
         // - poolCollateral is WNat, so we can use its price for calculation of CR fee
         uint256 reservationFee = agent.availableAgentsPos != 0
             ? _reservationFee(collateralData.poolCollateral.amgToTokenWeiPrice, valueAMG)
             : 0;
         require(msg.value >= reservationFee, InappropriateFeeAmount());
+
         // create new crt id - pre-increment, so that id can never be 0
         state.newCrtId += PaymentReference.randomizedIdSkip();
         uint256 crtId = state.newCrtId;
+
         // create in-memory cr and then put it to storage to not go out-of-stack
         CollateralReservation.Data memory cr;
         cr.valueAMG = valueAMG;
         cr.underlyingFeeUBA = Conversion.convertAmgToUBA(valueAMG).mulBips(agent.feeBIPS).toUint128();
         cr.reservationFeeNatWei = reservationFee.toUint128();
+
         // 1 is added for backward compatibility where 0 means "value not stored" - it is subtracted when used
         cr.poolFeeShareBIPS = agent.poolFeeShareBIPS + 1;
         cr.agentVault = _agentVault;
         cr.minter = msg.sender;
+
         if (_executor != address(0)) {
             cr.executor = _executor;
             cr.executorFeeNatGWei = ((msg.value - reservationFee) / Conversion.GWEI).toUint64();
         }
+
         (uint64 lastUnderlyingBlock, uint64 lastUnderlyingTimestamp) = _lastPaymentBlock();
         cr.firstUnderlyingBlock = state.currentUnderlyingBlock;
         cr.lastUnderlyingBlock = lastUnderlyingBlock;
         cr.lastUnderlyingTimestamp = lastUnderlyingTimestamp;
         cr.status = CollateralReservation.Status.ACTIVE;
+
         // store cr
         state.crts[crtId] = cr;
+
         // emit event
         _emitCollateralReservationEvent(agent, cr, crtId);
+
         // if executor is not set, we return the change to the minter
         if (cr.executor == address(0) && msg.value > reservationFee) {
             Transfers.transferNAT(payable(msg.sender), msg.value - reservationFee);
@@ -138,7 +153,7 @@ contract CollateralReservationsFacet is AssetManagerBase, ReentrancyGuard {
 
     function _reserveCollateral(
         Agent.State storage _agent,
-        uint64 _reservationAMG
+        uint64 _reservationAMG // reserveCollateral() -> includes pool fee
     )
         private
     {

@@ -26,21 +26,26 @@ library LiquidationPaymentStrategy {
         AssetManagerSettings.Data storage settings = Globals.getSettings();
         uint256 step = _currentLiquidationStep(_agent);
         uint256 factorBIPS = settings.liquidationCollateralFactorBIPS[step];
+
         // All premiums are expressed as factor BIPS.
         // Current algorithm for splitting payment: use liquidationCollateralFactorBIPS for vault collateral and
         // pay the rest from pool. If any factor exceeds the CR of that collateral, pay that collateral at
         // its CR and pay more of the other. If both collaterals exceed CR, limit both to their CRs.
         _c1FactorBIPS = Math.min(settings.liquidationFactorVaultCollateralBIPS[step], factorBIPS);
+
         // prevent paying with invalid token (if there is enough of the other tokens)
         CollateralTypeInt.Data storage vaultCollateral = _agent.getVaultCollateral();
         CollateralTypeInt.Data storage poolCollateral = _agent.getPoolCollateral();
+
         if (!vaultCollateral.isValid() && poolCollateral.isValid()) {
             // vault collateral invalid - pay everything with pool collateral
             _c1FactorBIPS = 0;
-        } else if (vaultCollateral.isValid() && !poolCollateral.isValid()) {
+        }
+        else if (vaultCollateral.isValid() && !poolCollateral.isValid()) {
             // pool collateral - pay everything with vault collateral
             _c1FactorBIPS = factorBIPS;
         }
+
         // never exceed CR of tokens
         if (_c1FactorBIPS > _vaultCR) {
             _c1FactorBIPS = _vaultCR;

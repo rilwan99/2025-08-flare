@@ -20,14 +20,19 @@ contract EmergencyPauseTransfersFacet is AssetManagerBase, IAssetManagerEvents {
         onlyAssetManagerController
     {
         AssetManagerState.State storage state = AssetManagerState.get();
+        // true -> indicate transfersEmergencyPausedUntil is currently active
         bool pausedAtStart = _transfersPaused();
+
         if (_byGovernance) {
             state.transfersEmergencyPausedUntil = (block.timestamp + _duration).toUint64();
             state.transfersEmergencyPausedByGovernance = true;
-        } else {
+        }
+        else {
+            // Asset Manager is already currently paused
             if (pausedAtStart && state.transfersEmergencyPausedByGovernance) {
                 revert PausedByGovernance();
             }
+
             AssetManagerSettings.Data storage settings = Globals.getSettings();
             uint256 resetTs = state.transfersEmergencyPausedUntil + settings.emergencyPauseDurationResetAfterSeconds;
             if (resetTs <= block.timestamp) {

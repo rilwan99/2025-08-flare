@@ -48,12 +48,15 @@ contract CollateralTypesFacet is AssetManagerBase {
     {
         // use separate rate limit for each collateral type
         bytes32 actionKey = keccak256(abi.encode(msg.sig, _collateralClass, _token));
+        // Verify this is either the first update, or enough time passed since last update
         SettingsUpdater.checkEnoughTimeSinceLastUpdate(actionKey);
+
         // validate
         bool ratiosValid =
             SafePct.MAX_BIPS < _minCollateralRatioBIPS &&
             _minCollateralRatioBIPS <= _safetyMinCollateralRatioBIPS;
         require(ratiosValid, CollateralTypes.InvalidCollateralRatios());
+
         // update
         CollateralTypeInt.Data storage token = CollateralTypes.get(_collateralClass, _token);
         token.minCollateralRatioBIPS = _minCollateralRatioBIPS.toUint32();
@@ -78,9 +81,11 @@ contract CollateralTypesFacet is AssetManagerBase {
     {
         AssetManagerSettings.Data storage settings = Globals.getSettings();
         CollateralTypeInt.Data storage token = CollateralTypes.get(_collateralClass, _token);
-        // validate
+
+        // Either called for the first time OR previosly set _invalidationTimeSec has elapsed
         require(token.validUntil == 0 || token.validUntil > block.timestamp, TokenNotValid());
         require(_invalidationTimeSec >= settings.tokenInvalidationTimeMinSeconds, DeprecationTimeToShort());
+
         // update
         uint256 validUntil = block.timestamp + _invalidationTimeSec;
         token.validUntil = validUntil.toUint64();

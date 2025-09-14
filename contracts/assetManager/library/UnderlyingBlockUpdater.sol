@@ -37,16 +37,20 @@ library UnderlyingBlockUpdater {
         AssetManagerState.State storage state = AssetManagerState.get();
         bool changed = false;
         uint64 finalizationBlockNumber = _blockNumber + _numberOfConfirmations;
+
         if (finalizationBlockNumber > state.currentUnderlyingBlock) {
             state.currentUnderlyingBlock = finalizationBlockNumber;
             changed = true;
         }
+
         uint256 finalizationBlockTimestamp = _blockTimestamp +
             _numberOfConfirmations * Globals.getSettings().averageBlockTimeMS / 1000;
+
         if (finalizationBlockTimestamp > state.currentUnderlyingBlockTimestamp) {
             state.currentUnderlyingBlockTimestamp = finalizationBlockTimestamp.toUint64();
             changed = true;
         }
+
         if (changed) {
             state.currentUnderlyingBlockUpdatedAt = block.timestamp.toUint64();
             emit IAssetManagerEvents.CurrentUnderlyingBlockUpdated(

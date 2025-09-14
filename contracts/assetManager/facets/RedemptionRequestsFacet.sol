@@ -70,6 +70,7 @@ contract RedemptionRequestsFacet is AssetManagerBase, ReentrancyGuard {
             length: 0,
             items: new RedemptionRequests.AgentRedemptionData[](maxRedeemedTickets)
         });
+
         uint256 redeemedLots = 0;
         for (uint256 i = 0; i < maxRedeemedTickets && redeemedLots < _lots; i++) {
             // redemption queue empty?
@@ -80,7 +81,9 @@ contract RedemptionRequestsFacet is AssetManagerBase, ReentrancyGuard {
             // each loop, firstTicketId will change since we delete the first ticket
             redeemedLots += _redeemFirstTicket(_lots - redeemedLots, redemptionList);
         }
+
         uint256 executorFeeNatGWei = msg.value / Conversion.GWEI;
+
         for (uint256 i = 0; i < redemptionList.length; i++) {
             // distribute executor fee over redemption request with at most 1 gwei leftover
             uint256 currentExecutorFeeNatGWei = executorFeeNatGWei / (redemptionList.length - i);
@@ -88,10 +91,12 @@ contract RedemptionRequestsFacet is AssetManagerBase, ReentrancyGuard {
             RedemptionRequests.createRedemptionRequest(redemptionList.items[i], msg.sender,
                 _redeemerUnderlyingAddressString, false, _executor, currentExecutorFeeNatGWei.toUint64(), 0, false);
         }
+
         // notify redeemer of incomplete requests
         if (redeemedLots < _lots) {
             emit IAssetManagerEvents.RedemptionRequestIncomplete(msg.sender, _lots - redeemedLots);
         }
+
         // burn the redeemed value of fassets
         uint256 redeemedUBA = Conversion.convertLotsToUBA(redeemedLots);
         Redemptions.burnFAssets(msg.sender, redeemedUBA);
@@ -227,27 +232,36 @@ contract RedemptionRequestsFacet is AssetManagerBase, ReentrancyGuard {
         Redemption.Request storage request = Redemptions.getRedemptionRequest(_redemptionRequestId, true);
         assert(!request.transferToCoreVault);   // we have a problem if core vault has invalid address
         Agent.State storage agent = Agent.get(request.agentVault);
+
         // check status
         require(request.status == Redemption.Status.ACTIVE, InvalidRedemptionStatus());
+
         // only owner can call
         Agents.requireAgentVaultOwner(agent);
+
         // check proof
         TransactionAttestation.verifyAddressValidity(_proof);
+
         // the actual redeemer's address must be validated
         bytes32 addressHash = keccak256(bytes(_proof.data.requestBody.addressStr));
         require(addressHash == request.redeemerUnderlyingAddressHash, WrongAddress());
+
         // and the address must be invalid or not normalized
         bool valid = _proof.data.responseBody.isValid &&
             _proof.data.responseBody.standardAddressHash == request.redeemerUnderlyingAddressHash;
         require(!valid, AddressValid());
+
         // release agent collateral
         AgentBacking.endRedeemingAssets(agent, request.valueAMG, request.poolSelfClose);
+
         // burn the executor fee
         Redemptions.burnExecutorFee(request);
+
         // emit event
         uint256 valueUBA = Conversion.convertAmgToUBA(request.valueAMG);
         emit IAssetManagerEvents.RedemptionRejected(request.agentVault, request.redeemer,
             _redemptionRequestId, valueUBA);
+
         // finish redemption request at end
         Redemptions.finishRedemptionRequest(_redemptionRequestId, request, Redemption.Status.REJECTED);
     }
@@ -303,6 +317,7 @@ contract RedemptionRequestsFacet is AssetManagerBase, ReentrancyGuard {
     {
         AssetManagerSettings.Data storage settings = Globals.getSettings();
         Agent.State storage agent = Agent.get(_agentVault);
+
         // if dust is more than 1 lot, create a new redemption ticket
         if (agent.dustAMG >= settings.lotSizeAMG) {
             uint64 remainingDustAMG = agent.dustAMG % settings.lotSizeAMG;
@@ -325,11 +340,13 @@ contract RedemptionRequestsFacet is AssetManagerBase, ReentrancyGuard {
         if (ticketId == 0) {
             return 0;    // empty redemption queue
         }
+
         RedemptionQueue.Ticket storage ticket = state.redemptionQueue.getTicket(ticketId);
         address agentVault = ticket.agentVault;
         Agent.State storage agent = Agent.get(agentVault);
         uint256 maxRedeemLots = (ticket.valueAMG + agent.dustAMG) / settings.lotSizeAMG;
         _redeemedLots = Math.min(_lots, maxRedeemLots);
+
         if (_redeemedLots > 0) {
             uint64 redeemedAMG = Conversion.convertLotsToAMG(_redeemedLots);
             // find list index for ticket's agent
@@ -337,10 +354,13 @@ contract RedemptionRequestsFacet is AssetManagerBase, ReentrancyGuard {
             while (index < _list.length && _list.items[index].agentVault != agentVault) {
                 ++index;
             }
+
             // add to list item or create new item
             if (index < _list.length) {
                 _list.items[index].valueAMG = _list.items[index].valueAMG + redeemedAMG;
-            } else {
+            }
+
+            else {
                 _list.items[_list.length++] = RedemptionRequests.AgentRedemptionData({
                     agentVault: agentVault,
                     valueAMG: redeemedAMG
@@ -348,7 +368,9 @@ contract RedemptionRequestsFacet is AssetManagerBase, ReentrancyGuard {
             }
             // _removeFromTicket may delete ticket data, so we call it at end
             Redemptions.removeFromTicket(ticketId, redeemedAMG);
-        } else {
+        }
+
+        else {
             // this will just convert ticket to dust
             Redemptions.removeFromTicket(ticketId, 0);
         }

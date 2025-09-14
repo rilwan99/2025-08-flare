@@ -20,14 +20,18 @@ contract EmergencyPauseFacet is AssetManagerBase, IAssetManagerEvents {
         onlyAssetManagerController
     {
         AssetManagerState.State storage state = AssetManagerState.get();
+        // true -> Indicates Asset Manager is currently ppaised
         bool pausedAtStart = _paused();
+
         if (_byGovernance) {
             state.emergencyPausedUntil = (block.timestamp + _duration).toUint64();
             state.emergencyPausedByGovernance = true;
-        } else {
+        }
+        else {
             if (pausedAtStart && state.emergencyPausedByGovernance) {
                 revert PausedByGovernance();
             }
+
             AssetManagerSettings.Data storage settings = Globals.getSettings();
             if (state.emergencyPausedUntil + settings.emergencyPauseDurationResetAfterSeconds <= block.timestamp) {
                 state.emergencyPausedTotalDuration = 0;
